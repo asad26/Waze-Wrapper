@@ -25,7 +25,7 @@ public class WazeData {
 	private static ApiForOmi obj;
 	private static int count;
 	public static String omiURL;
-	
+
 	/* Constructor for initializing variables */
 	public WazeData(Properties prop) {
 		obj = new ApiForOmi();
@@ -42,7 +42,7 @@ public class WazeData {
 		String streetId = null;
 		Iterator<?> iterator = jObject.keys();
 		while (iterator.hasNext()) {
-			
+
 			String key = (String) iterator.next();
 			if (key.equals("sid")) {
 				if (!(jObject.get(key) instanceof JSONObject)) {
@@ -61,11 +61,11 @@ public class WazeData {
 				}
 			}
 		}
-		
+
 		if (topCityId == null || topCityId.isEmpty()) {
 			topCityId = "No-City";
 		}
-		
+
 		if (streetId == null || streetId.isEmpty()) {
 			streetId = "No-Street";
 		}

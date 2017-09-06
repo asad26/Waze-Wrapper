@@ -53,7 +53,7 @@ public class Main {
 			System.out.println("Total jams that need to be processed: " + wazeArray.length());
 			wazeObject.parseArray(wazeArray);	
 		}
-		
+
 		System.out.println("***Done***");
 
 	}
