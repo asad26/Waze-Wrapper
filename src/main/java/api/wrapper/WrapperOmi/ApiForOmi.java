@@ -21,6 +21,13 @@ public class ApiForOmi {
 				"</Object>";
 		return odfObject;
 	}
+	
+	public String createOdfObject(String id) {
+		String odfObject = "<Object>" +
+				"<id>" + id + "</id>" +
+				"</Object>";
+		return odfObject;
+	}
 
 	public String createOdfObjects(String nObject) {
 		String odfObjects = "<Objects xmlns=\"http://www.opengroup.org/xsd/odf/1.0/\">" +
