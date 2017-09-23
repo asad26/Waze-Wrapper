@@ -8,7 +8,7 @@ Steps for running this wrapper:
 	
 1 - Clone project folder: git clone https://github.com/asad26/Waze-Wrapper
 
-2 - In config.properties, add your consumer_key and consumer_secret from your Brussels Smart City APIs account
+2 - In resources/config.properties, add your consumer_key and consumer_secret from your Brussels Smart City APIs account
 
 3 - Extract o-mi-node-0.9.2-warp10.zip and run OMI node from o-mi-node-0.9.2-warp10/bin directory
 
