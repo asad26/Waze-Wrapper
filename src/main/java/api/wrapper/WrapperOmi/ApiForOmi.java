@@ -38,7 +38,7 @@ public class ApiForOmi {
 
 	public String createWriteMessage(String objects) {
 
-		String omiEnvelope = "<omiEnvelope xmlns=\"http://www.opengroup.org/xsd/omi/1.0/\" version=\"1.0\" ttl=\"300\">" +
+		String omiEnvelope = "<omiEnvelope xmlns=\"http://www.opengroup.org/xsd/omi/1.0/\" version=\"1.0\" ttl=\"0\">" +
 				"<write msgformat=\"odf\">" +
 				"<msg>" +
 				objects +
@@ -46,4 +46,5 @@ public class ApiForOmi {
 		return omiEnvelope;
 
 	}
+
 }

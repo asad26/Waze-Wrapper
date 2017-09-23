@@ -7,90 +7,95 @@
 
 package api.wrapper.WrapperOmi;
 
-import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Properties;
-import java.util.Scanner;
-
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
+
 
 public class Main {
 
-	//private static String segmentsURL = "https://api.irisnetlab.be:443/api/biotope-datasources/0.0.1/biotope_street_axis2/axis";
-
-	public static void main(String[] args) throws FileNotFoundException, IOException, JSONException {
+	public static void main(String[] args) {
 
 		// Load and get properties from the file
 		Properties prop = new Properties();
-		prop.load(new FileInputStream("resources/config.properties"));
+		try {
+			prop.load(new FileInputStream("resources/config.properties"));
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
 		String consumerKey = prop.getProperty("consumer_key");
 		String consumerSecret = prop.getProperty("consumer_secret");
-		//String urlSelection = prop.getProperty("url_selection");
 
 		WazeData wazeObject = new WazeData(prop);
 
 		// Generating an access token
-		String accessToken = wazeObject.getAccessToken(consumerKey, consumerSecret);
-		
-		//String segmentsURL = "https://api.irisnetlab.be:443/api/biotope-datasources/0.0.1/biotope_street_axis2/axis?limit=22780&offset=0";
-		//String segmentsData = wazeObject.getJsonData(segmentsURL, accessToken);
-		//System.out.println(segmentsData);
-		
-//		int offset = 0;
-//		while (offset < 22780) {
-//			String segmentsURL = "https://api.irisnetlab.be:443/api/biotope-datasources/0.0.1/biotope_street_axis2/axis?limit=1&offset=" + Integer.toString(offset);
-//			String segmentsData = wazeObject.getJsonData(segmentsURL, accessToken);
-//			JSONObject segmentsObject = new JSONObject(segmentsData);
-//			JSONObject jObjectS = (JSONObject) segmentsObject.get("data_list");
-//			JSONObject jSingle = (JSONObject) jObjectS.get("data");
-//			
-//			wazeObject.createCompleteOdf(jSingle);
-//
-//			offset ++;
-//			System.out.println("********" + offset);
-//		}
-//		System.out.println("The ODF structure with all segments has been created!");
-		
-		int offset = 0;
-		while (wazeObject.total < 22780) {
-			String segmentsURL = "https://api.irisnetlab.be:443/api/biotope-datasources/0.0.1/biotope_street_axis2/axis?limit=1000&offset=" + Integer.toString(offset);
-			String segmentsData = wazeObject.getJsonData(segmentsURL, accessToken);
-			JSONObject segmentsObject = new JSONObject(segmentsData);
-			JSONObject jObjectS = (JSONObject) segmentsObject.get("data_list");
-			JSONArray segmentsArray = (JSONArray) jObjectS.get("data");
+		String accessToken = null;
 
-			wazeObject.parseArray(segmentsArray, 1);
-			wazeObject.odfPrint();
-			
-			offset = offset + 1000;
-			//System.out.println("********" + offset);
+		/*try {
+			accessToken = wazeObject.getAccessToken(consumerKey, consumerSecret);
+		} catch (JSONException e1) {
+			e1.printStackTrace();
 		}
-		System.out.println("The ODF structure with all segments has been created!");
 
-		// For getting waze alerts and parse it
+		int offset = 0;
+		while (wazeObject.count < 22780) {
+			String segmentsURL = "https://api.irisnetlab.be:443/api/biotope-datasources/0.0.1/biotope_street_axis2/axis?limit=1000&offset=" + Integer.toString(offset);
+			try {
+				String segmentsData = wazeObject.getJsonData(segmentsURL, accessToken);
+				JSONObject segmentsObject = new JSONObject(segmentsData);
+				JSONObject jObjectS = (JSONObject) segmentsObject.get("data_list");
+				JSONArray segmentsArray = (JSONArray) jObjectS.get("data");
+				wazeObject.parseArray(segmentsArray, 0);
+				//wazeObject.sendPartialSegments();
+				offset = offset + 1000;
+				System.out.println("Segments processed: " + wazeObject.count);
+			} catch (Throwable e) {
+				e.printStackTrace();
+			}	
+		}
+		System.out.println("*** The ODF structure with all segments has been processed!");*/
 
-				String wazeAlertsUrl = prop.getProperty("waze_alerts");
+		String wazeAlertsUrl = prop.getProperty("waze_alerts");
+		String wazeJamsUrl = prop.getProperty("waze_jams");
+		int chk = 1;
+		
+		while (true) {
+			// For getting waze alerts and parse it
+			try {
+				
+				accessToken = wazeObject.getAccessToken(consumerKey, consumerSecret);
 				String jsonDataA = wazeObject.getJsonData(wazeAlertsUrl, accessToken);
 				JSONObject jObjectA = new JSONObject(jsonDataA);
 				JSONObject wazeAlertsA = (JSONObject) jObjectA.get("waze_alerts");
 				JSONArray wazeArrayA = (JSONArray) wazeAlertsA.get("waze_alert");
+				
+				// For getting waze jams and parse it
+				accessToken = wazeObject.getAccessToken(consumerKey, consumerSecret);
+				String jsonDataJ = wazeObject.getJsonData(wazeJamsUrl, accessToken);
+				JSONObject jObjectJ = new JSONObject(jsonDataJ);
+				JSONObject wazeAlertsJ = (JSONObject) jObjectJ.get("waze_jams");
+				JSONArray wazeArrayJ = (JSONArray) wazeAlertsJ.get("waze_jam");
+			
+				if (chk == 1) {
+					wazeObject.parseArray(wazeArrayA, 1);
+					wazeObject.parseArray(wazeArrayJ, 1);
+					chk = 2;
+				}
+				
 				System.out.println("Total alerts that need to be processed: " + wazeArrayA.length());
-				wazeObject.parseArray(wazeArrayA, 0);	
-		//
-		//		String wazeJamsUrl = prop.getProperty("waze_jams");
-		//		String jsonDataJ = wazeObject.getJsonData(wazeJamsUrl, accessToken);
-		//		JSONObject jObjectJ = new JSONObject(jsonDataJ);
-		//		JSONObject wazeAlertsJ = (JSONObject) jObjectJ.get("waze_jams");
-		//		JSONArray wazeArrayJ = (JSONArray) wazeAlertsJ.get("waze_jam");
-		//		System.out.println("Total jams that need to be processed: " + wazeArrayJ.length());
-		//		wazeObject.parseArray(wazeArrayJ);	
-
-		System.out.println("***Done***");
-
+				wazeObject.parseArray(wazeArrayA, 2);
+				System.out.println("*****Done*****");
+				
+				System.out.println("Total jams that need to be processed: " + wazeArrayJ.length());
+				wazeObject.parseArray(wazeArrayJ, 2);
+				System.out.println("*****Done*****");
+				
+				Thread.sleep(180000);
+			} catch (Throwable e) {
+				System.out.println(e.getMessage());
+			}	
+		}
 	}
-
 }
