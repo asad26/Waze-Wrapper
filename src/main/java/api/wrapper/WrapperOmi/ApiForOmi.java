@@ -13,18 +13,17 @@ public class ApiForOmi {
 		String infoItem = "<InfoItem name=\"" + name + "\"><value>" + value + "</value></InfoItem>";
 		return infoItem;
 	}
+	
+	public String createInfoItem(String name, String value, String pubDate) {
+		String infoItem = "<InfoItem name=\"" + name + "\"><value dateTime=\"" + pubDate + "\" type=\"xs:integer\">" + 
+				value + "</value></InfoItem>";
+		return infoItem;
+	}
 
 	public String createOdfObject(String id, String nInfoItems) {
 		String odfObject = "<Object>" +
 				"<id>" + id + "</id>" +
 				nInfoItems +
-				"</Object>";
-		return odfObject;
-	}
-	
-	public String createOdfObject(String id) {
-		String odfObject = "<Object>" +
-				"<id>" + id + "</id>" +
 				"</Object>";
 		return odfObject;
 	}

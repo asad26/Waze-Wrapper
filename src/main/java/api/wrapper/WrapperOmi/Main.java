@@ -59,40 +59,33 @@ public class Main {
 
 		String wazeAlertsUrl = prop.getProperty("waze_alerts");
 		String wazeJamsUrl = prop.getProperty("waze_jams");
-		int chk = 1;
 		
 		while (true) {
-			// For getting waze alerts and parse it
 			try {
-				
+				// For getting waze alerts and parse it
 				accessToken = wazeObject.getAccessToken(consumerKey, consumerSecret);
+				System.out.println("Data access has been granted...!");
 				String jsonDataA = wazeObject.getJsonData(wazeAlertsUrl, accessToken);
 				JSONObject jObjectA = new JSONObject(jsonDataA);
 				JSONObject wazeAlertsA = (JSONObject) jObjectA.get("waze_alerts");
 				JSONArray wazeArrayA = (JSONArray) wazeAlertsA.get("waze_alert");
 				
 				// For getting waze jams and parse it
-				accessToken = wazeObject.getAccessToken(consumerKey, consumerSecret);
 				String jsonDataJ = wazeObject.getJsonData(wazeJamsUrl, accessToken);
 				JSONObject jObjectJ = new JSONObject(jsonDataJ);
 				JSONObject wazeAlertsJ = (JSONObject) jObjectJ.get("waze_jams");
 				JSONArray wazeArrayJ = (JSONArray) wazeAlertsJ.get("waze_jam");
-			
-				if (chk == 1) {
-					wazeObject.parseArray(wazeArrayA, 1);
-					wazeObject.parseArray(wazeArrayJ, 1);
-					chk = 2;
-				}
 				
 				System.out.println("Total alerts that need to be processed: " + wazeArrayA.length());
-				wazeObject.parseArray(wazeArrayA, 2);
+				wazeObject.parseArray(wazeArrayA, 1);
 				System.out.println("*****Done*****");
 				
 				System.out.println("Total jams that need to be processed: " + wazeArrayJ.length());
-				wazeObject.parseArray(wazeArrayJ, 2);
+				wazeObject.parseArray(wazeArrayJ, 1);
 				System.out.println("*****Done*****");
 				
-				Thread.sleep(180000);
+				System.out.println("Wait for 4 minutes...");
+				Thread.sleep(240000);
 			} catch (Throwable e) {
 				System.out.println(e.getMessage());
 			}	

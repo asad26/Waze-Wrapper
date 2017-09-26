@@ -13,7 +13,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
 
 import org.apache.http.HttpEntity;
@@ -38,6 +40,8 @@ public class WazeData {
 	private static String odfComplete;
 	private static SegmentsDB database;
 
+	private static List<String> wazeSegments;
+
 	/* Constructor for initializing variables */
 	public WazeData(Properties prop) {
 		obj = new ApiForOmi();
@@ -45,9 +49,10 @@ public class WazeData {
 		omiURL = prop.getProperty("omi_node");
 		odfComplete = "";
 		database = new SegmentsDB();
-//		try {
-//			database.createTable();
-//		} catch (ClassNotFoundException e) {}
+		wazeSegments = new ArrayList<String>();
+		//		try {
+		//			database.createTable();
+		//		} catch (ClassNotFoundException e) {}
 	}
 
 
@@ -57,11 +62,8 @@ public class WazeData {
 		for (int i=0; i<jArray.length(); i++) {
 			if (jArray.get(i) instanceof JSONObject) {
 				if (select == 0) {
-					//createCompleteOdf((JSONObject) jArray.get(i));
-					storeSegmentsData((JSONObject) jArray.get(i));
-				}
-				else if (select == 1) {
-					createOdfStructure((JSONObject) jArray.get(i));
+					createCompleteOdf((JSONObject) jArray.get(i));
+					//storeSegmentsData((JSONObject) jArray.get(i));
 				}
 				else {
 					createOmi((JSONObject) jArray.get(i));
@@ -69,12 +71,12 @@ public class WazeData {
 			}
 		}
 	}
-	
+
 	/* Get segments from biotope API and create object structure */
 	public void storeSegmentsData(JSONObject jObject) throws JSONException {
 		String sid = "Sa." + jObject.getString("id");
 		String pos = jObject.getString("shape").toString();
-		String nameFre = jObject.getString("PN_NAME_FRE").toString();
+		String nameFre = jObject.getString("PN_NAME_FRE");
 		String nameDut = jObject.getString("PN_NAME_DUT");
 
 		try {
@@ -83,33 +85,28 @@ public class WazeData {
 		count ++;
 	}
 
-	public static void createOdfStructure(JSONObject jObject) throws JSONException {
+	public static void createOdfStructure(String sid) throws JSONException {
 		String infoItems = "";
 
 		String[] relatedData = new String[3];
-		if (!(jObject.get("sid") instanceof JSONObject)) {
+		try {
+			relatedData = database.queryData(sid);
+		} catch (ClassNotFoundException e) {}
 
-			String sid = "Sa." + jObject.getString("sid");
+		infoItems = infoItems + obj.createInfoItem("Street-Name-DUT", relatedData[0]);
+		infoItems = infoItems + obj.createInfoItem("Street-Name-FRE", relatedData[1]);
+		infoItems = infoItems + obj.createInfoItem("Position", relatedData[2]);
+		infoItems = infoItems + obj.createInfoItem("Status", "NotApplicable");
+		infoItems = infoItems + obj.createInfoItem("Publication-Date", "NotApplicable");
+		infoItems = infoItems + obj.createInfoItem("Cause", "NotApplicable");
+		infoItems = infoItems + obj.createInfoItem("Measured-Speed", "NotApplicable");
+		infoItems = infoItems + obj.createInfoItem("Information-Reliability", "NotApplicable");
+		infoItems = infoItems + obj.createInfoItem("Information-Confidence", "NotApplicable");
 
-			try {
-				relatedData = database.queryData(sid);
-			} catch (ClassNotFoundException e) {}
-			
-			infoItems = infoItems + obj.createInfoItem("Street-Name-DUT", relatedData[0]);
-			infoItems = infoItems + obj.createInfoItem("Street-Name-FRE", relatedData[1]);
-			infoItems = infoItems + obj.createInfoItem("Position", relatedData[2]);
-			infoItems = infoItems + obj.createInfoItem("Status", "NotApplicable");
-			infoItems = infoItems + obj.createInfoItem("Publication-Date", "NotApplicable");
-			infoItems = infoItems + obj.createInfoItem("Cause", "NotApplicable");
-			infoItems = infoItems + obj.createInfoItem("Measured-Speed", "NotApplicable");
-			infoItems = infoItems + obj.createInfoItem("Information-Reliability", "NotApplicable");
-			infoItems = infoItems + obj.createInfoItem("Information-Confidence", "NotApplicable");
-
-			String sidObject = obj.createOdfObject(sid, infoItems);
-			String streetObject = obj.createOdfObject("Brussels-Smart-City", sidObject);
-			String finalMessage = obj.createWriteMessage(obj.createOdfObjects(streetObject));
-			sendData(omiURL, finalMessage);
-		}
+		String sidObject = obj.createOdfObject(sid, infoItems);
+		String streetObject = obj.createOdfObject("Brussels-Smart-City", sidObject);
+		String finalMessage = obj.createWriteMessage(obj.createOdfObjects(streetObject));
+		sendData(omiURL, finalMessage);
 	}
 
 	/* Get items from Waze JSON array, create object, and send to the sand box one at a time */
@@ -119,18 +116,24 @@ public class WazeData {
 		if (!(jObject.get("sid") instanceof JSONObject)) {
 
 			String sid = "Sa." + jObject.getString("sid");
+
+			if (!(wazeSegments.contains(sid))) {
+				wazeSegments.add(sid);
+				createOdfStructure(sid);
+			}
 			
+
 			Iterator<?> iterator = jObject.keys();
 			while (iterator.hasNext()) {
 				String key = (String) iterator.next();
 
 				if (key.equals("type")) {
 					String newKey="Status";
-					infoItems = infoItems + obj.createInfoItem(newKey, jObject.get(key).toString());
+					infoItems = infoItems + obj.createInfoItem(newKey, jObject.getString(key));
 				}
 				else if (key.equals("pubdate")){
 					String newKey="Publication-Date";
-					infoItems = infoItems + obj.createInfoItem(newKey, jObject.get(key).toString());
+					infoItems = infoItems + obj.createInfoItem(newKey, jObject.getString(key));
 				}
 				else if (key.equals("reportdescription")){
 					String newKey="Cause";
@@ -148,15 +151,15 @@ public class WazeData {
 				}
 				else if (key.equals("speed")){
 					String newKey="Measured-Speed";
-					infoItems = infoItems + obj.createInfoItem(newKey, jObject.get(key).toString());
+					infoItems = infoItems + obj.createInfoItem(newKey, jObject.getString(key));
 				}
 				else if (key.equals("reliability")){
 					String newKey="Information-Reliability";
-					infoItems = infoItems + obj.createInfoItem(newKey, jObject.get(key).toString());
+					infoItems = infoItems + obj.createInfoItem(newKey, jObject.getString(key));
 				}
 				else if (key.equals("confidence")){
 					String newKey="Information-Confidence";
-					infoItems = infoItems + obj.createInfoItem(newKey, jObject.get(key).toString());
+					infoItems = infoItems + obj.createInfoItem(newKey, jObject.getString(key));
 				}
 				else {} 
 			}
@@ -168,60 +171,51 @@ public class WazeData {
 	}
 
 	/* Get segments from biotope API and create object structure */
-	/*public void createCompleteOdf(JSONObject jObject) throws JSONException {
+	public void createCompleteOdf(JSONObject jObject) throws JSONException {
 		String infoItems = "";
-		String sid = null;
 
 		// Just for database storage
-		String nameFre = null;
-		String nameDut = null;
-		String pos = null;
+		//		String nameFre = null;
+		//		String nameDut = null;
+		//		String pos = null;
 
-		Iterator<?> iterator = jObject.keys();
-		while (iterator.hasNext()) {
+		int group = Integer.valueOf(jObject.getString("id")) % 500;
 
-			String key = (String) iterator.next();
-			if (key.equals("id")) {
-				sid = "Sa." + jObject.getString(key);
+		String sid = "Sa." + jObject.getString("id");
+		//infoItems = infoItems + obj.createInfoItem("Status", "n/a");
+		//infoItems = infoItems + obj.createInfoItem("Measured-Speed", "n/a");
+		//infoItems = infoItems + obj.createInfoItem("Information-Reliability", "n/a");
+		//infoItems = infoItems + obj.createInfoItem("Information-Confidence", "n/a");
+		//infoItems = infoItems + obj.createInfoItem("Cause", "n/a");
 
-				//infoItems = infoItems + obj.createInfoItem("Status", "n/a");
-				//infoItems = infoItems + obj.createInfoItem("Measured-Speed", "n/a");
-				//infoItems = infoItems + obj.createInfoItem("Information-Reliability", "n/a");
-				//infoItems = infoItems + obj.createInfoItem("Information-Confidence", "n/a");
-				//infoItems = infoItems + obj.createInfoItem("Cause", "n/a");
-			}
-			else if (key.equals("shape")) {
-				String newKey="Position";
-				infoItems = infoItems + obj.createInfoItem(newKey, jObject.get(key).toString());
-				pos = jObject.get(key).toString();
-			}
-			else if (key.equals("PN_NAME_FRE")) {
-				String newKey="Street-Name-FRE";
-				infoItems = infoItems + obj.createInfoItem(newKey, jObject.get(key).toString());
-				nameFre = jObject.get(key).toString();
-			}
-			else if (key.equals("PN_NAME_DUT")) {
-				String newKey="Street-Name-DUT";
-				infoItems = infoItems + obj.createInfoItem(newKey, jObject.get(key).toString());
-				nameDut = jObject.get(key).toString();
-			}
-			else {}
-		}
+		infoItems = infoItems + obj.createInfoItem("Position", jObject.getString("shape"));
+		//pos = jObject.get(key).toString();
 
-		try {
-			database.insert(sid, nameDut, nameFre, pos);
-		} catch (ClassNotFoundException e) {}
-		odfComplete = odfComplete + obj.createOdfObject(sid, infoItems);
+		infoItems = infoItems + obj.createInfoItem("Street-Name-FRE", jObject.getString("PN_NAME_FRE"));
+		//nameFre = jObject.get(key).toString();
+
+		infoItems = infoItems + obj.createInfoItem("Street-Name-DUT", jObject.getString("PN_NAME_DUT"));
+		//nameDut = jObject.get(key).toString();
+
+
+		//		try {
+		//			database.insert(sid, nameDut, nameFre, pos);
+		//		} catch (ClassNotFoundException e) {}
+		//odfComplete = odfComplete + obj.createOdfObject(sid, infoItems);
+		String segmentObject = obj.createOdfObject(sid, infoItems);
+		String groupObject = obj.createOdfObject("Group-" + Integer.toString(group), segmentObject);
+		String cityObject = obj.createOdfObject("Brussels-Smart-City", groupObject);
+		String finalMessage = obj.createWriteMessage(obj.createOdfObjects(cityObject));
+		sendData(omiURL, finalMessage);
 		count ++;
-	}*/
+	}
 
 	public void sendPartialSegments() throws ClientProtocolException, IOException {
 		String cityObject = obj.createOdfObject("Brussels-Smart-City", odfComplete);
 		String finalMessage = obj.createWriteMessage(obj.createOdfObjects(cityObject));
-		//System.out.println(finalMessage);
 		sendOdfData(omiURL, finalMessage);
 		odfComplete = "";
-		System.out.println(count);
+		//System.out.println(count);
 	}
 
 	/* Method call to create access token for authorization */
@@ -351,7 +345,7 @@ public class WazeData {
 		HttpClient client = HttpClientBuilder.create().build();
 		HttpPost post = new HttpPost(url);
 
-		HttpEntity entity = new ByteArrayEntity(finalMessage.getBytes("ISO-8859-4"));
+		HttpEntity entity = new ByteArrayEntity(finalMessage.getBytes("UTF-8"));
 		post.addHeader("Content-Type", "text/xml");
 		post.setEntity(entity);
 		HttpResponse response = client.execute(post);
