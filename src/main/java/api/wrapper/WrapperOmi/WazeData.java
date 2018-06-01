@@ -13,6 +13,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -40,12 +41,17 @@ public class WazeData {
     private static String       odfComplete;
     private static SegmentsDB   database;
     private static List<String> wazeSegments;
+    private final String consumerKey;
+    private final String consumerSecret;
     public         int          count;
+    private        AccessToken  accessToken;
 
     /* Constructor for initializing variables */
     public WazeData(Properties prop) {
-        obj = new ApiForOmi();
         count = 0;
+        consumerKey = prop.getProperty("consumer_key");
+        consumerSecret = prop.getProperty("consumer_secret");
+        obj = new ApiForOmi();
         omiURL = prop.getProperty("omi_node");
         odfComplete = "";
         database = new SegmentsDB();
@@ -141,7 +147,7 @@ public class WazeData {
      * @param url
      * @param finalMessage
      */
-    private static void sendData(String url, String finalMessage) {
+    private static boolean sendData(String url, String finalMessage) {
         HttpURLConnection httpcon = null;
         OutputStream os = null;
         try {
@@ -154,8 +160,10 @@ public class WazeData {
             os = httpcon.getOutputStream();
             os.write(outputBytes);
             httpcon.getResponseMessage();
+            return true;
         } catch (Exception e) {
             LOG.error("Error while sending data to O-MI.", e);
+            return false;
         } finally {
             if (os != null) {
                 try {
@@ -163,7 +171,6 @@ public class WazeData {
                 } catch (IOException e) {
                 }
             }
-
             if (httpcon != null) {
                 httpcon.disconnect();
             }
@@ -208,7 +215,8 @@ public class WazeData {
                 } else {
                     createOmi((JSONObject) jArray.get(i));
                 }
-                LOG.debug("Treated JSONObject in {}ms. Remaining : {}", System.currentTimeMillis() - timeMs, jArray.length() - i);
+                LOG.debug("Treated JSONObject in {}ms. Remaining : {}", System.currentTimeMillis() - timeMs,
+                        jArray.length() - i);
             }
 
         }
@@ -289,56 +297,60 @@ public class WazeData {
     /**
      * Method call to create access token for authorization
      *
-     * @param key
-     * @param secret
      * @return
      * @throws JSONException
      */
-    public String getAccessToken(String key, String secret) throws JSONException {
+    public String getAccessToken() throws JSONException {
+        if (accessToken == null || accessToken.tokenLastCreated.plusSeconds(accessToken.expiresIn)
+                .isBefore(LocalDateTime.now())) {
+            String data = "grant_type=client_credentials&client_id=" + consumerKey + "&client_secret=" + consumerSecret;
+            HttpURLConnection httpcon = null;
+            BufferedReader br = null;
+            OutputStream os = null;
+            JSONObject jObject = null;
 
-        String data = "grant_type=client_credentials&client_id=" + key + "&client_secret=" + secret;
-        HttpURLConnection httpcon = null;
-        BufferedReader br = null;
-        OutputStream os = null;
-        JSONObject jObject = null;
-        try {
-            httpcon = (HttpURLConnection) ((new URL("https://api.irisnetlab.be:443/api/token").openConnection()));
-            httpcon.setDoOutput(true);
-            httpcon.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-            httpcon.setRequestMethod("POST");
-            byte[] outputBytes = data.getBytes("UTF-8");
-            os = httpcon.getOutputStream();
-            os.write(outputBytes);
-            LOG.trace("Connection : {}", httpcon.getResponseMessage());
-            br = new BufferedReader(new InputStreamReader(httpcon.getInputStream()));
-            StringBuffer response = new StringBuffer();
-            String inputLine;
-            while ((inputLine = br.readLine()) != null) {
-                response.append(inputLine);
-            }
-            jObject = new JSONObject(response.toString());
-        } catch (Exception e) {
-            LOG.error("Exception while getting access token.", e);
-        } finally {
-            if (os != null) {
-                try {
-                    os.close();
-                } catch (IOException e) {
+            try {
+                httpcon = (HttpURLConnection) ((new URL("https://api.irisnetlab.be:443/api/token").openConnection()));
+                httpcon.setDoOutput(true);
+                httpcon.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                httpcon.setRequestMethod("POST");
+                byte[] outputBytes = data.getBytes("UTF-8");
+                os = httpcon.getOutputStream();
+                os.write(outputBytes);
+                LOG.trace("Connection : {}", httpcon.getResponseMessage());
+                br = new BufferedReader(new InputStreamReader(httpcon.getInputStream()));
+                StringBuffer response = new StringBuffer();
+                String inputLine;
+                while ((inputLine = br.readLine()) != null) {
+                    response.append(inputLine);
+                }
+                jObject = new JSONObject(response.toString());
+            } catch (Exception e) {
+                LOG.error("Exception while getting access token.", e);
+                throw new IllegalStateException("Cannot build token");
+            } finally {
+                if (os != null) {
+                    try {
+                        os.close();
+                    } catch (IOException e) {
+                    }
+                }
+                if (httpcon != null) {
+                    httpcon.disconnect();
+                }
+
+                if (br != null) {
+                    try {
+                        br.close();
+                    } catch (IOException e) {
+                    }
                 }
             }
-            if (httpcon != null) {
-                httpcon.disconnect();
-            }
-
-            if (br != null) {
-                try {
-                    br.close();
-                } catch (IOException e) {
-                }
-            }
+            accessToken = new AccessToken(jObject.get("access_token").toString(),
+                    new Long(jObject.get("expires_in").toString()));
         }
 
-        return jObject.get("access_token").toString();
+        return accessToken.token;
     }
 
     /**
@@ -383,5 +395,21 @@ public class WazeData {
         }
 
         return response.toString();
+    }
+
+    /**
+     * Store a token with some time data which helps with token caching.
+     */
+    private static class AccessToken {
+
+        String        token;
+        Long          expiresIn;
+        LocalDateTime tokenLastCreated;
+
+        AccessToken(String token, Long expiresIn) {
+            this.token = token;
+            this.expiresIn = expiresIn;
+            this.tokenLastCreated = LocalDateTime.now();
+        }
     }
 }

@@ -11,7 +11,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,11 +19,13 @@ public class Main {
 
     private static final String PROCESS_SEGMENTS       = "-processSegments";
     private static final String PROCESS_SEGMENTS_SHORT = "-ps";
+    private static final int    MAX_RETRY              = 5;
+    private static final Logger LOG                    = LoggerFactory.getLogger(Main.class);
 
-    private static final Logger  LOG             = LoggerFactory.getLogger(Main.class);
-    private static       Boolean processSegments = Boolean.FALSE;
+    private static int     retriedTimes    = 0;
+    private static Boolean processSegments = Boolean.FALSE;
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         processArgs(args);
         // Load and get properties from the file
         Properties prop = new Properties();
@@ -33,39 +34,28 @@ public class Main {
         } catch (IOException e1) {
             LOG.error("Error loading properties.", e1);
         }
-        String consumerKey = prop.getProperty("consumer_key");
-        String consumerSecret = prop.getProperty("consumer_secret");
 
         WazeData wazeObject = new WazeData(prop);
 
-        // Generating an access token
-        String accessToken = null;
-        try {
-            accessToken = wazeObject.getAccessToken(consumerKey, consumerSecret);
-        } catch (JSONException e1) {
-            LOG.error("Unable to get access token.", e1);
-        }
-
         if (processSegments) {
             LOG.debug("-ps flag detected");
-            processSegments(accessToken, wazeObject);
+            processSegments(wazeObject);
         }
 
         String wazeAlertsUrl = prop.getProperty("waze_alerts");
         String wazeJamsUrl = prop.getProperty("waze_jams");
 
-        while (true) {
+        while (retriedTimes < MAX_RETRY) {
             try {
                 // For getting waze alerts and parse it
-                accessToken = wazeObject.getAccessToken(consumerKey, consumerSecret);
                 LOG.debug("Data access has been granted...!");
-                String jsonDataA = wazeObject.getJsonData(wazeAlertsUrl, accessToken);
+                String jsonDataA = wazeObject.getJsonData(wazeAlertsUrl, wazeObject.getAccessToken());
                 JSONObject jObjectA = new JSONObject(jsonDataA);
                 JSONObject wazeAlertsA = (JSONObject) jObjectA.get("waze_alerts");
                 JSONArray wazeArrayA = (JSONArray) wazeAlertsA.get("waze_alert");
 
                 // For getting waze jams and parse it
-                String jsonDataJ = wazeObject.getJsonData(wazeJamsUrl, accessToken);
+                String jsonDataJ = wazeObject.getJsonData(wazeJamsUrl, wazeObject.getAccessToken());
                 JSONObject jObjectJ = new JSONObject(jsonDataJ);
                 JSONObject wazeAlertsJ = (JSONObject) jObjectJ.get("waze_jams");
                 JSONArray wazeArrayJ = (JSONArray) wazeAlertsJ.get("waze_jam");
@@ -80,20 +70,28 @@ public class Main {
 
                 LOG.debug("Wait for 4 minutes...");
                 Thread.sleep(240000);
-            } catch (Throwable e) {
+                retriedTimes = 0;
+            } catch (Exception e) {
                 LOG.error("Error during process.", e);
+                retriedTimes++;
+                try {
+                    Thread.sleep(240000);
+                } catch (InterruptedException ie) {
+                    LOG.error("Interrupted.", ie);
+                    throw ie;
+                }
             }
         }
     }
 
-    private static void processSegments(String accessToken, WazeData wazeObject) {
+    private static void processSegments(WazeData wazeObject) {
         int offset = 0;
         while (wazeObject.count < 22780) {
             String segmentsURL =
                     "https://api.irisnetlab.be:443/api/biotope-datasources/0.0.1/biotope_street_axis2/axis?limit=1000&offset="
                             + Integer.toString(offset);
             try {
-                String segmentsData = wazeObject.getJsonData(segmentsURL, accessToken);
+                String segmentsData = wazeObject.getJsonData(segmentsURL, wazeObject.getAccessToken());
                 JSONObject segmentsObject = new JSONObject(segmentsData);
                 JSONObject jObjectS = (JSONObject) segmentsObject.get("data_list");
                 JSONArray segmentsArray = (JSONArray) jObjectS.get("data");
@@ -101,7 +99,7 @@ public class Main {
                 wazeObject.sendPartialSegments();
                 offset = offset + 1000;
                 LOG.debug("{} segments processed.", wazeObject.count);
-            } catch (Throwable e) {
+            } catch (Exception e) {
                 LOG.error("Error while processing segments.", e);
             }
         }
@@ -115,6 +113,7 @@ public class Main {
                 case PROCESS_SEGMENTS_SHORT:
                     processSegments = Boolean.TRUE;
                     break;
+                default:
             }
         }
     }
